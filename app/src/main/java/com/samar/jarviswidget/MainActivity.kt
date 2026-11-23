@@ -5,10 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
-import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -24,7 +22,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,7 +29,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,12 +45,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,7 +57,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -75,7 +67,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -105,8 +96,6 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.cos
-import kotlin.math.sin
 
 // ─── Palette (Tony Stark / Arc Reactor inspired) ─────────────────────────────
 private val BgVoid = Color(0xFF03070C)
@@ -215,7 +204,6 @@ class SamarApiClient(private val endpointUrl: String) {
         memories: List<String>,
         userMessage: String
     ): SamarChatResult {
-        // Local intelligent fallback when backend is not configured
         if (endpointUrl.contains("tumhara-live-backend-url") || endpointUrl.isBlank()) {
             return localFallback(userMessage)
         }
@@ -314,13 +302,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var memoryStore: MemoryStore
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListening = false
+    private var pendingVoiceCallback: ((String) -> Unit)? = null
 
     // ⚠️ CHANGE THIS to your real backend URL when ready
     private val BACKEND_URL = "https://tumhara-live-backend-url/api/samar/chat"
 
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startVoiceInput()
+            if (granted) startVoiceInput(pendingVoiceCallback)
             else Toast.makeText(this, "Microphone permission required for voice", Toast.LENGTH_SHORT).show()
         }
 
@@ -344,6 +333,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startVoiceInput(onResult: ((String) -> Unit)? = null) {
+        pendingVoiceCallback = onResult
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -411,7 +401,6 @@ class MainActivity : ComponentActivity() {
             logs.add(HudLog(tag, msg, color))
         }
 
-        // Live clock + battery
         LaunchedEffect(Unit) {
             while (true) {
                 currentTime = getCurrentTime()
@@ -420,7 +409,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Auto-scroll terminal
         LaunchedEffect(logs.size) {
             if (logs.isNotEmpty()) listState.animateScrollToItem(logs.lastIndex)
         }
@@ -460,147 +448,65 @@ class MainActivity : ComponentActivity() {
         }
 
         Box(modifier = Modifier.fillMaxSize().background(BgVoid)) {
-            // Subtle grid background
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val step = 48.dp.toPx()
+                val gridColor = NeonCyan.copy(alpha = 0.04f)
                 for (x in 0..size.width.toInt() step step.toInt()) {
-                    drawLine(Color(0xFF0A1520), Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height), 1f)
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(x.toFloat(), 0f),
+                        end = Offset(x.toFloat(), size.height),
+                        strokeWidth = 1f
+                    )
                 }
                 for (y in 0..size.height.toInt() step step.toInt()) {
-                    drawLine(Color(0xFF0A1520), Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), 1f)
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, y.toFloat()),
+                        end = Offset(size.width, y.toFloat()),
+                        strokeWidth = 1f
+                    )
                 }
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp)
+                    .padding(14.dp)
             ) {
-                // ── TOP STATUS BAR ───────────────────────────────────────────
+                // Top Status Bar
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(PanelDark)
-                        .border(1.dp, NeonCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (state.toggles.masterActive) NeonGreen else AmberAlert)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "SAMAR  //  ${if (state.toggles.masterActive) "ONLINE" else "OFFLINE"}",
-                            color = if (state.toggles.masterActive) NeonGreen else AmberAlert,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
                     Text(
-                        "BAT:$batteryPct%   $currentTime",
-                        color = TextDim,
+                        "SAMAR // $systemState",
+                        color = NeonCyan,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // ── REACTOR CORE ─────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ArcReactor(
-                        isActive = state.toggles.masterActive && !isProcessing,
-                        isProcessing = isProcessing,
-                        onTap = {
-                            if (!isProcessing) {
-                                appendLog("CMD", "CORE TAPPED — listening…", NeonCyan)
-                                isListeningUi = true
-                                startVoiceInput { text ->
-                                    isListeningUi = false
-                                    handlePrompt(text)
-                                }
-                            }
-                        }
-                    )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "SAMAR",
-                            color = TextPrimary,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 4.sp
-                        )
-                        Text(
-                            if (isListeningUi) "LISTENING…" else if (isProcessing) "THINKING…" else "TAP CORE",
-                            color = NeonCyan,
-                            fontSize = 12.sp,
+                            "BAT $batteryPct% • $currentTime",
+                            color = TextDim,
+                            fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace
                         )
+                        IconButton(onClick = { showSettings = !showSettings }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AmberAlert)
+                        }
                     }
                 }
 
-                // Status line
-                Text(
-                    "> STATUS: $systemState",
-                    color = NeonCyan,
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                // ── ACTION BUTTONS ───────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ActionNode(
-                        label = "PING SYS",
-                        color = NeonGreen,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        appendLog("SYS", "Ping OK — core healthy, memory ${state.learnedMemories.size} entries", NeonGreen)
-                        systemState = "DIAGNOSTIC // COMPLETE"
-                    }
-                    ActionNode(
-                        label = "WEB SEARCH",
-                        color = NeonCyan,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        val q = userInput.ifBlank { "SAMAR AI assistant" }
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(q)}"))
-                        context.startActivity(intent)
-                        appendLog("NET", "Opening web search: $q", NeonCyan)
-                    }
-                    ActionNode(
-                        label = "SETTINGS",
-                        color = AmberAlert,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        showSettings = !showSettings
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // ── SETTINGS PANEL (toggle) ──────────────────────────────────
                 if (showSettings) {
+                    Spacer(Modifier.height(8.dp))
                     SettingsPanel(
                         state = state,
                         onUpdate = { newToggles ->
                             state = state.copy(toggles = newToggles)
-                            appendLog("KAVACH", "Toggles updated", AmberAlert)
+                            appendLog("SYS", "Toggles updated", NeonCyan)
                         },
                         onClearMemory = {
                             memoryStore.save(emptyList())
@@ -609,41 +515,72 @@ class MainActivity : ComponentActivity() {
                         },
                         onClose = { showSettings = false }
                     )
-                    Spacer(Modifier.height(10.dp))
-                }
-
-                // ── TERMINAL STREAM ──────────────────────────────────────────
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(PanelDark)
-                        .border(1.dp, NeonGreen.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                        .padding(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Spacer(Modifier.height(8.dp))
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "TERMINAL_STREAM // LIVE",
-                            color = NeonGreen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            "[CLEAR]",
-                            color = TextDim,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.clickable {
-                                logs.clear()
-                                appendLog("SYS", "Terminal cleared", TextDim)
+                        ArcReactor(
+                            isActive = state.toggles.masterActive,
+                            isProcessing = isProcessing,
+                            onTap = {
+                                isListeningUi = true
+                                startVoiceInput { text ->
+                                    isListeningUi = false
+                                    handlePrompt(text)
+                                }
                             }
                         )
                     }
+
+                    Text(
+                        samarReply,
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(PanelDark)
+                            .border(1.dp, PanelBorder, RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ActionNode("STATUS", NeonCyan, Modifier.weight(1f)) {
+                            handlePrompt("kaise ho")
+                        }
+                        ActionNode("CODE RED", AmberAlert, Modifier.weight(1f)) {
+                            handlePrompt("CODE RED SAMAR")
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(PanelDark)
+                        .border(1.dp, PanelBorder, RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        "TERMINAL LOG",
+                        color = TextDim,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
                     Spacer(Modifier.height(6.dp))
                     LazyColumn(
                         state = listState,
@@ -771,7 +708,6 @@ class MainActivity : ComponentActivity() {
             val cy = size.height / 2
             val baseR = size.minDimension / 2.4f
 
-            // Outer glow
             drawCircle(
                 color = ReactorGlow.copy(alpha = 0.12f * pulse),
                 radius = baseR * 1.35f,
@@ -783,7 +719,6 @@ class MainActivity : ComponentActivity() {
                 center = Offset(cx, cy)
             )
 
-            // Outer ring
             drawCircle(
                 color = NeonCyan.copy(alpha = 0.5f),
                 radius = baseR * 1.15f,
@@ -791,12 +726,9 @@ class MainActivity : ComponentActivity() {
                 style = Stroke(width = 2.5.dp.toPx())
             )
 
-            // Rotating segments
             rotate(if (isProcessing) processSpin else rotation, Offset(cx, cy)) {
                 for (i in 0 until 6) {
                     val angle = i * 60f
-                    val start = Math.toRadians(angle.toDouble())
-                    val end = Math.toRadians((angle + 35).toDouble())
                     drawArc(
                         color = NeonCyan.copy(alpha = 0.7f),
                         startAngle = angle,
@@ -809,7 +741,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Mid ring
             drawCircle(
                 color = NeonCyanDim.copy(alpha = 0.6f),
                 radius = baseR * 0.75f,
@@ -817,7 +748,6 @@ class MainActivity : ComponentActivity() {
                 style = Stroke(width = 2.dp.toPx())
             )
 
-            // Core
             val coreAlpha = if (isActive) 0.9f * pulse else 0.35f
             drawCircle(
                 brush = Brush.radialGradient(
