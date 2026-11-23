@@ -1,0 +1,44 @@
+name: Organize Project Files
+
+on:
+  workflow_dispatch:
+
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Move files into proper folders
+        run: |
+          mkdir -p gradle/wrapper
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+
+          [ -f "gradle-wrapper.jar" ] && git mv "gradle-wrapper.jar" "gradle/wrapper/gradle-wrapper.jar" || true
+          [ -f "gradle-wrapper.properties" ] && git mv "gradle-wrapper.properties" "gradle/wrapper/gradle-wrapper.properties" || true
+          [ -f "AndroidManifest.xml" ] && git mv "AndroidManifest.xml" "app/src/main/AndroidManifest.xml" || true
+          [ -f "samar_icon.png" ] && git mv "samar_icon.png" "app/src/main/res/drawable/samar_icon.png" || true
+          [ -f "ic_launcher.png" ] && git mv "ic_launcher.png" "app/src/main/res/mipmap-hdpi/ic_launcher.png" || true
+          [ -f "strings.xml" ] && git mv "strings.xml" "app/src/main/res/values/strings.xml" || true
+          [ -f "jarvis_widget_info.xml" ] && git mv "jarvis_widget_info.xml" "app/src/main/res/xml/jarvis_widget_info.xml" || true
+
+          if [ -f "build.gradle (1).kts" ]; then
+            git rm -f "build.gradle (1).kts"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --staged --quiet; then
+            git commit -m "Organize uploaded files into proper folders"
+            git push
+          else
+            echo "Nothing to move."
+          fi
+          
