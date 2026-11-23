@@ -97,7 +97,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// ─── Palette (Tony Stark / Arc Reactor inspired) ─────────────────────────────
 private val BgVoid = Color(0xFF03070C)
 private val PanelDark = Color(0xFF0A121C)
 private val PanelBorder = Color(0xFF1A2A3A)
@@ -110,7 +109,6 @@ private val TextDim = Color(0xFF7A8FA0)
 private val ReactorCore = Color(0xFF00D4FF)
 private val ReactorGlow = Color(0xFF00A0CC)
 
-// ─── Data ────────────────────────────────────────────────────────────────────
 data class HudLog(
     val tag: String,
     val message: String,
@@ -136,7 +134,6 @@ data class SamarChatResult(
     val newMemoryToSave: String? = null
 )
 
-// ─── Brain / System Prompt ───────────────────────────────────────────────────
 object SamarBrain {
     fun buildSystemPrompt(state: SamarState): String {
         val caps = buildList {
@@ -163,7 +160,6 @@ Keep replies concise (1-4 sentences) unless the user asks for detail. Sound like
     }
 }
 
-// ─── Voice Engine ────────────────────────────────────────────────────────────
 class JarvisVoiceEngine(
     context: Context,
     private val onScreenText: (String) -> Unit
@@ -197,7 +193,6 @@ class JarvisVoiceEngine(
     }
 }
 
-// ─── API Client ──────────────────────────────────────────────────────────────
 class SamarApiClient(private val endpointUrl: String) {
     fun sendMessage(
         systemPrompt: String,
@@ -269,7 +264,6 @@ class SamarApiClient(private val endpointUrl: String) {
     }
 }
 
-// ─── Memory Helper ───────────────────────────────────────────────────────────
 class MemoryStore(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("samar_memory", Context.MODE_PRIVATE)
@@ -294,7 +288,6 @@ class MemoryStore(context: Context) {
     }
 }
 
-// ─── Main Activity ───────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
 
     private lateinit var voiceEngine: JarvisVoiceEngine
@@ -304,7 +297,6 @@ class MainActivity : ComponentActivity() {
     private var isListening = false
     private var pendingVoiceCallback: ((String) -> Unit)? = null
 
-    // ⚠️ CHANGE THIS to your real backend URL when ready
     private val BACKEND_URL = "https://tumhara-live-backend-url/api/samar/chat"
 
     private val micPermissionLauncher =
@@ -317,7 +309,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         memoryStore = MemoryStore(this)
         apiClient = SamarApiClient(BACKEND_URL)
-        voiceEngine = JarvisVoiceEngine(this) { /* handled inside Compose */ }
+        voiceEngine = JarvisVoiceEngine(this) { }
 
         setContent {
             Surface(modifier = Modifier.fillMaxSize(), color = BgVoid) {
@@ -368,7 +360,6 @@ class MainActivity : ComponentActivity() {
         speechRecognizer?.startListening(intent)
     }
 
-    // ─── HUD Screen ──────────────────────────────────────────────────────────
     @Composable
     fun SamarHudScreen() {
         val context = LocalContext.current
@@ -474,7 +465,6 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
                     .padding(14.dp)
             ) {
-                // Top Status Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -484,415 +474,4 @@ class MainActivity : ComponentActivity() {
                         "SAMAR // $systemState",
                         color = NeonCyan,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "BAT $batteryPct% • $currentTime",
-                            color = TextDim,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        IconButton(onClick = { showSettings = !showSettings }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = AmberAlert)
-                        }
-                    }
-                }
-
-                if (showSettings) {
-                    Spacer(Modifier.height(8.dp))
-                    SettingsPanel(
-                        state = state,
-                        onUpdate = { newToggles ->
-                            state = state.copy(toggles = newToggles)
-                            appendLog("SYS", "Toggles updated", NeonCyan)
-                        },
-                        onClearMemory = {
-                            memoryStore.save(emptyList())
-                            state = state.copy(learnedMemories = mutableListOf())
-                            appendLog("MEM", "All memories cleared", AmberAlert)
-                        },
-                        onClose = { showSettings = false }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ArcReactor(
-                            isActive = state.toggles.masterActive,
-                            isProcessing = isProcessing,
-                            onTap = {
-                                isListeningUi = true
-                                startVoiceInput { text ->
-                                    isListeningUi = false
-                                    handlePrompt(text)
-                                }
-                            }
-                        )
-                    }
-
-                    Text(
-                        samarReply,
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(PanelDark)
-                            .border(1.dp, PanelBorder, RoundedCornerShape(10.dp))
-                            .padding(10.dp)
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ActionNode("STATUS", NeonCyan, Modifier.weight(1f)) {
-                            handlePrompt("kaise ho")
-                        }
-                        ActionNode("CODE RED", AmberAlert, Modifier.weight(1f)) {
-                            handlePrompt("CODE RED SAMAR")
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(PanelDark)
-                        .border(1.dp, PanelBorder, RoundedCornerShape(12.dp))
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        "TERMINAL LOG",
-                        color = TextDim,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(logs) { log ->
-                            Text(
-                                "[${log.tag}] ${log.message}",
-                                color = log.accent,
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                // ── INPUT BAR ────────────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = userInput,
-                        onValueChange = { userInput = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = {
-                            Text("Command SAMAR…", color = TextDim, fontSize = 14.sp)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { handlePrompt(userInput) }),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonCyan,
-                            unfocusedBorderColor = PanelBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            cursorColor = NeonCyan,
-                            focusedContainerColor = PanelDark,
-                            unfocusedContainerColor = PanelDark
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(
-                        onClick = {
-                            isListeningUi = true
-                            startVoiceInput { text ->
-                                isListeningUi = false
-                                handlePrompt(text)
-                            }
-                        },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(if (isListeningUi) NeonCyan.copy(0.3f) else PanelDark)
-                            .border(1.dp, NeonCyan, CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Mic,
-                            contentDescription = "Voice",
-                            tint = if (isListeningUi) NeonCyan else TextPrimary
-                        )
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    IconButton(
-                        onClick = { handlePrompt(userInput) },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(NeonCyan.copy(0.15f))
-                            .border(1.dp, NeonCyan, CircleShape)
-                    ) {
-                        Icon(Icons.Default.Send, contentDescription = "Send", tint = NeonCyan)
-                    }
-                }
-            }
-        }
-    }
-
-    // ─── Arc Reactor Composable ──────────────────────────────────────────────
-    @Composable
-    private fun ArcReactor(
-        isActive: Boolean,
-        isProcessing: Boolean,
-        onTap: () -> Unit
-    ) {
-        val infinite = rememberInfiniteTransition(label = "reactor")
-        val rotation by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(8000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "rot"
-        )
-        val pulse by infinite.animateFloat(
-            initialValue = 0.7f,
-            targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse"
-        )
-        val processSpin by infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(900, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "proc"
-        )
-
-        Canvas(
-            modifier = Modifier
-                .size(200.dp)
-                .clickable { onTap() }
-        ) {
-            val cx = size.width / 2
-            val cy = size.height / 2
-            val baseR = size.minDimension / 2.4f
-
-            drawCircle(
-                color = ReactorGlow.copy(alpha = 0.12f * pulse),
-                radius = baseR * 1.35f,
-                center = Offset(cx, cy)
-            )
-            drawCircle(
-                color = ReactorGlow.copy(alpha = 0.08f),
-                radius = baseR * 1.55f,
-                center = Offset(cx, cy)
-            )
-
-            drawCircle(
-                color = NeonCyan.copy(alpha = 0.5f),
-                radius = baseR * 1.15f,
-                center = Offset(cx, cy),
-                style = Stroke(width = 2.5.dp.toPx())
-            )
-
-            rotate(if (isProcessing) processSpin else rotation, Offset(cx, cy)) {
-                for (i in 0 until 6) {
-                    val angle = i * 60f
-                    drawArc(
-                        color = NeonCyan.copy(alpha = 0.7f),
-                        startAngle = angle,
-                        sweepAngle = 35f,
-                        useCenter = false,
-                        topLeft = Offset(cx - baseR, cy - baseR),
-                        size = Size(baseR * 2, baseR * 2),
-                        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-            }
-
-            drawCircle(
-                color = NeonCyanDim.copy(alpha = 0.6f),
-                radius = baseR * 0.75f,
-                center = Offset(cx, cy),
-                style = Stroke(width = 2.dp.toPx())
-            )
-
-            val coreAlpha = if (isActive) 0.9f * pulse else 0.35f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        ReactorCore.copy(alpha = coreAlpha),
-                        ReactorGlow.copy(alpha = coreAlpha * 0.4f),
-                        Color.Transparent
-                    ),
-                    center = Offset(cx, cy),
-                    radius = baseR * 0.55f
-                ),
-                radius = baseR * 0.55f,
-                center = Offset(cx, cy)
-            )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.85f * pulse),
-                radius = baseR * 0.18f,
-                center = Offset(cx, cy)
-            )
-        }
-    }
-
-    // ─── Action Node Button ──────────────────────────────────────────────────
-    @Composable
-    private fun ActionNode(
-        label: String,
-        color: Color,
-        modifier: Modifier = Modifier,
-        onClick: () -> Unit
-    ) {
-        Box(
-            modifier = modifier
-                .height(42.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(PanelDark)
-                .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                .clickable { onClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                label,
-                color = color,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-
-    // ─── Settings Panel ──────────────────────────────────────────────────────
-    @Composable
-    private fun SettingsPanel(
-        state: SamarState,
-        onUpdate: (SamarToggles) -> Unit,
-        onClearMemory: () -> Unit,
-        onClose: () -> Unit
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(PanelDark)
-                .border(1.dp, AmberAlert.copy(0.4f), RoundedCornerShape(12.dp))
-                .padding(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("KAVACH // CONTROLS", color = AmberAlert, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text("CLOSE", color = TextDim, fontSize = 12.sp, modifier = Modifier.clickable { onClose() })
-            }
-            Spacer(Modifier.height(10.dp))
-
-            ToggleRow("Master Active", state.toggles.masterActive) {
-                onUpdate(state.toggles.copy(masterActive = it))
-            }
-            ToggleRow("Voice Responses", state.toggles.voiceEnabled) {
-                onUpdate(state.toggles.copy(voiceEnabled = it))
-            }
-            ToggleRow("Hands-Free (soon)", state.toggles.handsFreeWake) {
-                onUpdate(state.toggles.copy(handsFreeWake = it))
-            }
-            ToggleRow("Screen Lock (soon)", state.toggles.screenLockEnabled) {
-                onUpdate(state.toggles.copy(screenLockEnabled = it))
-            }
-            ToggleRow("Calls & Messages (soon)", state.toggles.callsAndMessagesEnabled) {
-                onUpdate(state.toggles.copy(callsAndMessagesEnabled = it))
-            }
-            ToggleRow("Emergency CODE RED", state.toggles.emergencyCodeEnabled) {
-                onUpdate(state.toggles.copy(emergencyCodeEnabled = it))
-            }
-
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Memories stored: ${state.learnedMemories.size}",
-                color = TextDim,
-                fontSize = 12.sp
-            )
-            Spacer(Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x33FF4444))
-                    .border(1.dp, Color(0xFFFF5555), RoundedCornerShape(8.dp))
-                    .clickable { onClearMemory() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("CLEAR ALL MEMORIES", color = Color(0xFFFF8888), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-
-    @Composable
-    private fun ToggleRow(label: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(label, color = TextPrimary, fontSize = 13.sp)
-            Switch(
-                checked = checked,
-                onCheckedChange = onChecked,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = NeonCyan,
-                    checkedTrackColor = NeonCyan.copy(0.4f),
-                    uncheckedThumbColor = TextDim,
-                    uncheckedTrackColor = PanelBorder
-                )
-            )
-        }
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-    private fun getCurrentTime(): String {
-        return SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-    }
-
-    private fun getBatteryPercent(context: Context): Int {
-        val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    }
-}
+                    
